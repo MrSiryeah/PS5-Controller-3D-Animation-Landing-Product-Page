@@ -1,117 +1,148 @@
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import Lenis from 'lenis';
+import * as THREE from 'https://unpkg.com/three@0.162.0/build/three.module.js';
+import gsap from 'https://unpkg.com/gsap@3.12.5/index.js';
+import { ScrollTrigger } from 'https://unpkg.com/gsap@3.12.5/ScrollTrigger.js';
+import Lenis from 'https://unpkg.com/lenis@1.1.20/dist/lenis.mjs';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// ─── Lenis smooth scroll, wired into GSAP ticker ─────────────────────────────
+// Initialize Lenis for smooth scrolling
 const lenis = new Lenis({
-    duration: 1.4,
+    duration: 1.5,
     easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     smoothWheel: true,
 });
 
-// This is the CORRECT integration: pipe Lenis into GSAP's ticker
-gsap.ticker.add((time) => {
-    lenis.raf(time * 1000);
-});
-gsap.ticker.lagSmoothing(0);
+function raf(time) {
+    lenis.raf(time);
+    requestAnimationFrame(raf);
+}
+requestAnimationFrame(raf);
 
-// Keep ScrollTrigger updated from Lenis scroll events
 lenis.on('scroll', ScrollTrigger.update);
 
-// ─── Canvas & Video setup ─────────────────────────────────────────────────────
+// Three.js setup
 const canvas = document.getElementById('video-canvas');
-const ctx = canvas.getContext('2d');
 const video = document.getElementById('scroll-video');
 const videoSection = document.querySelector('.video-section');
 
-function resizeCanvas() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const renderer = new THREE.WebGLRenderer({
+    canvas: canvas,
+    antialias: true,
+    alpha: true
+});
 
-// Draw one frame of the video to the canvas, cover-fit
-function drawFrame() {
-    if (video.readyState < 2) return;
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
 
-    const vr = video.videoWidth / video.videoHeight;
-    const cr = canvas.width / canvas.height;
-    let w, h, x, y;
+// Create Video Texture
+const videoTexture = new THREE.VideoTexture(video);
+videoTexture.minFilter = THREE.LinearFilter;
+videoTexture.magFilter = THREE.LinearFilter;
+videoTexture.format = THREE.RGBAFormat;
 
-    if (cr > vr) {
-        w = canvas.width;
-        h = canvas.width / vr;
-        x = 0;
-        y = (canvas.height - h) / 2;
-    } else {
-        h = canvas.height;
-        w = canvas.height * vr;
-        x = (canvas.width - w) / 2;
-        y = 0;
+const geometry = new THREE.PlaneGeometry(2, 2);
+const material = new THREE.MeshBasicMaterial({ map: videoTexture });
+const mesh = new THREE.Mesh(geometry, material);
+scene.add(mesh);
+
+function resize() {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    
+    // Maintain aspect ratio cover
+    if (video.videoWidth && video.videoHeight) {
+        const videoRatio = video.videoWidth / video.videoHeight;
+        const canvasRatio = window.innerWidth / window.innerHeight;
+
+        if (canvasRatio > videoRatio) {
+            mesh.scale.set(canvasRatio / videoRatio, 1, 1);
+        } else {
+            mesh.scale.set(1, videoRatio / canvasRatio, 1);
+        }
     }
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(video, x, y, w, h);
 }
 
-// Render loop – runs every GSAP tick so the canvas always stays live
-gsap.ticker.add(drawFrame);
+window.addEventListener('resize', resize);
 
-// ─── Init once video metadata is available ────────────────────────────────────
-function init() {
-    // Jump to the last frame so the controller starts DECONSTRUCTED
-    video.currentTime = video.duration;
+function animate() {
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+animate();
 
+// Video scrubbing logic
+video.onloadedmetadata = () => {
+    resize();
+    initAnimations();
+};
+
+if (video.readyState >= 2) {
+    resize();
+    initAnimations();
+}
+
+function initAnimations() {
+    // Hero Entrance Animations
+    const tlEntrance = gsap.timeline();
+    tlEntrance.to('.hero-overlay h1', { opacity: 1, y: 0, duration: 1.5, ease: 'power4.out' })
+              .to('.hero-overlay .subtitle', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, '-=0.8');
+
+    // Scroll-synced video rendering & Hero fade
     ScrollTrigger.create({
         trigger: videoSection,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1,               // small scrub number = tighter, more responsive
+        scrub: true,
         onUpdate: (self) => {
-            // REVERSED: progress 0 (top) = end of video (deconstructed)
-            //           progress 1 (bottom) = start of video (built)
-            const t = (1 - self.progress) * video.duration;
-            video.currentTime = t;
+            if (video.duration) {
+                // CORRECTED logic: 0 at top (Deconstructed), duration at bottom (Built)
+                // Assuming video goes Deconstructed -> Built
+                const targetTime = self.progress * video.duration;
+                
+                // Direct current time setting for tighter feel
+                video.currentTime = targetTime;
+
+                // Hero fade out in first 5% of scroll
+                const heroFade = Math.max(0, 1 - self.progress * 20);
+                gsap.set('.hero-overlay', { opacity: heroFade, pointerEvents: heroFade < 0.1 ? 'none' : 'auto' });
+            }
         }
     });
 
-    // ── Info banners ─────────────────────────────────────────────────────────
+    // Info Banners
     const banners = [
-        { id: '#banner-1', start: '15%', end: '35%' },
-        { id: '#banner-2', start: '45%', end: '65%' },
-        { id: '#banner-3', start: '75%', end: '92%' },
+        { id: '#banner-1', start: 0.15, end: 0.35 },
+        { id: '#banner-2', start: 0.45, end: 0.65 },
+        { id: '#banner-3', start: 0.75, end: 0.95 }
     ];
 
-    banners.forEach(({ id, start, end }) => {
-        const el = document.querySelector(id);
+    banners.forEach((banner) => {
         ScrollTrigger.create({
             trigger: videoSection,
-            start: `${start} top`,
-            end: `${end} top`,
-            onEnter:      () => el.classList.add('active'),
-            onLeave:      () => el.classList.remove('active'),
-            onEnterBack:  () => el.classList.add('active'),
-            onLeaveBack:  () => el.classList.remove('active'),
+            start: `${banner.start * 100}% top`,
+            end: `${banner.end * 100}% top`,
+            onToggle: (self) => {
+                const el = document.querySelector(banner.id);
+                if (self.isActive) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            }
         });
     });
 
-    // ── Spec cards ────────────────────────────────────────────────────────────
+    // Spec Card Animations
     gsap.from('.spec-card', {
-        y: 80, opacity: 0, stagger: 0.15, duration: 0.9, ease: 'power3.out',
-        scrollTrigger: { trigger: '.specs', start: 'top 82%' }
+        y: 100,
+        opacity: 0,
+        stagger: 0.2,
+        duration: 1,
+        ease: 'power3.out',
+        scrollTrigger: {
+            trigger: '.specs',
+            start: 'top 80%'
+        }
     });
-
-    // ── Hero text ─────────────────────────────────────────────────────────────
-    gsap.to('.hero h1',      { opacity: 1, y: 0, duration: 1.4, ease: 'power4.out', delay: 0.2 });
-    gsap.to('.hero .subtitle', { opacity: 1, y: 0, duration: 1.1, ease: 'power3.out', delay: 0.7 });
-}
-
-// Fire init as soon as metadata is ready (or immediately if already loaded)
-if (video.readyState >= 1) {
-    init();
-} else {
-    video.addEventListener('loadedmetadata', init, { once: true });
 }

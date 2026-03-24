@@ -8,6 +8,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap" rel="stylesheet">
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.162.0/build/three.module.js",
+        "gsap": "https://unpkg.com/gsap@3.12.5/index.js",
+        "gsap/ScrollTrigger": "https://unpkg.com/gsap@3.12.5/ScrollTrigger.js",
+        "lenis": "https://unpkg.com/lenis@1.1.20/dist/lenis.mjs"
+      }
+    }
+    </script>
 </head>
 <body>
     <nav class="navbar">
@@ -20,17 +30,18 @@
     </nav>
 
     <main>
-        <section class="hero">
-            <h1 class="glitch" data-text="DualSense">DualSense</h1>
-            <p class="subtitle">Experience a deeper, highly immersive gaming experience.</p>
-        </section>
-
         <section class="video-section">
             <div class="video-container">
                 <canvas id="video-canvas"></canvas>
                 <video id="scroll-video" playsinline muted preload="auto" style="display: none;">
                     <source src="Deco_Render.mp4" type="video/mp4">
                 </video>
+
+                <!-- Integrated Hero Content -->
+                <div class="hero-overlay">
+                    <h1 class="glitch" data-text="DualSense">DualSense</h1>
+                    <p class="subtitle">Experience a deeper, highly immersive gaming experience.</p>
+                </div>
             </div>
 
             <!-- Info Banners -->
