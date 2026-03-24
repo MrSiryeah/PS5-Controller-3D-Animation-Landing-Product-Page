@@ -1,0 +1,20 @@
+{
+  "name": "ps5-controller-3d-animation-landing-product-page",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "gsap": "^3.14.2",
+    "lenis": "^1.3.20"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  }
+}
