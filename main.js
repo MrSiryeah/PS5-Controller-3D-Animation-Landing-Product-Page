@@ -1,143 +1,117 @@
-import { gsap } from 'gsap';
+import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
 
 gsap.registerPlugin(ScrollTrigger);
 
-// Initialize Lenis for smooth scrolling
+// ─── Lenis smooth scroll, wired into GSAP ticker ─────────────────────────────
 const lenis = new Lenis({
-    duration: 1.5,
+    duration: 1.4,
     easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     smoothWheel: true,
 });
 
-function raf(time) {
-    lenis.raf(time);
-    requestAnimationFrame(raf);
-}
-requestAnimationFrame(raf);
+// This is the CORRECT integration: pipe Lenis into GSAP's ticker
+gsap.ticker.add((time) => {
+    lenis.raf(time * 1000);
+});
+gsap.ticker.lagSmoothing(0);
 
+// Keep ScrollTrigger updated from Lenis scroll events
 lenis.on('scroll', ScrollTrigger.update);
 
-// Canvas setup
+// ─── Canvas & Video setup ─────────────────────────────────────────────────────
 const canvas = document.getElementById('video-canvas');
-const context = canvas.getContext('2d');
+const ctx = canvas.getContext('2d');
 const video = document.getElementById('scroll-video');
 const videoSection = document.querySelector('.video-section');
 
-// Set canvas dimensions
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    render();
 }
-
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-function render() {
-    if (video.readyState >= 2) {
-        const videoRatio = video.videoWidth / video.videoHeight;
-        const canvasRatio = canvas.width / canvas.height;
-        
-        let drawWidth, drawHeight, xOffset, yOffset;
+// Draw one frame of the video to the canvas, cover-fit
+function drawFrame() {
+    if (video.readyState < 2) return;
 
-        if (canvasRatio > videoRatio) {
-            drawWidth = canvas.width;
-            drawHeight = canvas.width / videoRatio;
-            xOffset = 0;
-            yOffset = (canvas.height - drawHeight) / 2;
-        } else {
-            drawHeight = canvas.height;
-            drawWidth = canvas.height * videoRatio;
-            yOffset = 0;
-            xOffset = (canvas.width - drawWidth) / 2;
-        }
+    const vr = video.videoWidth / video.videoHeight;
+    const cr = canvas.width / canvas.height;
+    let w, h, x, y;
 
-        context.clearRect(0, 0, canvas.width, canvas.height);
-        context.drawImage(video, xOffset, yOffset, drawWidth, drawHeight);
+    if (cr > vr) {
+        w = canvas.width;
+        h = canvas.width / vr;
+        x = 0;
+        y = (canvas.height - h) / 2;
+    } else {
+        h = canvas.height;
+        w = canvas.height * vr;
+        x = (canvas.width - w) / 2;
+        y = 0;
     }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, x, y, w, h);
 }
 
-// Video scrubbing logic
-video.onloadedmetadata = () => {
-    initAnimations();
-    resizeCanvas();
-};
+// Render loop – runs every GSAP tick so the canvas always stays live
+gsap.ticker.add(drawFrame);
 
-if (video.readyState >= 2) {
-    initAnimations();
-    resizeCanvas();
-}
-
-function initAnimations() {
-    // Hero Animations
-    const tlHero = gsap.timeline();
-    tlHero.to('.hero h1', { opacity: 1, y: 0, duration: 1.5, ease: 'power4.out' })
-          .to('.hero .subtitle', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, '-=0.8');
-
-    // Scroll-synced video rendering
-    const scrollProp = { progress: 0 };
+// ─── Init once video metadata is available ────────────────────────────────────
+function init() {
+    // Jump to the last frame so the controller starts DECONSTRUCTED
+    video.currentTime = video.duration;
 
     ScrollTrigger.create({
         trigger: videoSection,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: true,
+        scrub: 1,               // small scrub number = tighter, more responsive
         onUpdate: (self) => {
-            if (video.duration) {
-                // Reversed logic: 1 at top, 0 at bottom
-                // Scroll Top (progress 0) -> targetTime is duration (Deconstructed)
-                // Scroll Bottom (progress 1) -> targetTime is 0 (Built)
-                const targetTime = (1 - self.progress) * video.duration;
-                
-                // Using gsap.to to smoothly interpolate the currentTime
-                gsap.to(video, {
-                    currentTime: targetTime,
-                    duration: 0.1,
-                    onUpdate: render,
-                    overwrite: true
-                });
-            }
+            // REVERSED: progress 0 (top) = end of video (deconstructed)
+            //           progress 1 (bottom) = start of video (built)
+            const t = (1 - self.progress) * video.duration;
+            video.currentTime = t;
         }
     });
 
-    // Info Banners
+    // ── Info banners ─────────────────────────────────────────────────────────
     const banners = [
-        { id: '#banner-1', start: 0.15, end: 0.35 },
-        { id: '#banner-2', start: 0.45, end: 0.65 },
-        { id: '#banner-3', start: 0.75, end: 0.95 }
+        { id: '#banner-1', start: '15%', end: '35%' },
+        { id: '#banner-2', start: '45%', end: '65%' },
+        { id: '#banner-3', start: '75%', end: '92%' },
     ];
 
-    banners.forEach((banner) => {
+    banners.forEach(({ id, start, end }) => {
+        const el = document.querySelector(id);
         ScrollTrigger.create({
             trigger: videoSection,
-            start: `${banner.start * 100}% top`,
-            end: `${banner.end * 100}% top`,
-            onToggle: (self) => {
-                const el = document.querySelector(banner.id);
-                if (self.isActive) {
-                    el.classList.add('active');
-                } else {
-                    el.classList.remove('active');
-                }
-            }
+            start: `${start} top`,
+            end: `${end} top`,
+            onEnter:      () => el.classList.add('active'),
+            onLeave:      () => el.classList.remove('active'),
+            onEnterBack:  () => el.classList.add('active'),
+            onLeaveBack:  () => el.classList.remove('active'),
         });
     });
 
-    // Spec Card Animations
+    // ── Spec cards ────────────────────────────────────────────────────────────
     gsap.from('.spec-card', {
-        y: 100,
-        opacity: 0,
-        stagger: 0.2,
-        duration: 1,
-        ease: 'power3.out',
-        scrollTrigger: {
-            trigger: '.specs',
-            start: 'top 80%'
-        }
+        y: 80, opacity: 0, stagger: 0.15, duration: 0.9, ease: 'power3.out',
+        scrollTrigger: { trigger: '.specs', start: 'top 82%' }
     });
+
+    // ── Hero text ─────────────────────────────────────────────────────────────
+    gsap.to('.hero h1',      { opacity: 1, y: 0, duration: 1.4, ease: 'power4.out', delay: 0.2 });
+    gsap.to('.hero .subtitle', { opacity: 1, y: 0, duration: 1.1, ease: 'power3.out', delay: 0.7 });
 }
 
-// Initial render loop to keep canvas alive if video is playing/buffering
-gsap.ticker.add(render);
+// Fire init as soon as metadata is ready (or immediately if already loaded)
+if (video.readyState >= 1) {
+    init();
+} else {
+    video.addEventListener('loadedmetadata', init, { once: true });
+}
