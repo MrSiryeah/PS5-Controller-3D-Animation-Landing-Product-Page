@@ -27,22 +27,35 @@
 
         <section class="video-section">
             <div class="video-container">
-                <video id="scroll-video" playsinline muted preload="auto">
+                <canvas id="video-canvas"></canvas>
+                <video id="scroll-video" playsinline muted preload="auto" style="display: none;">
                     <source src="Deco_Render.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
                 </video>
             </div>
-            <div class="text-overlay first">
-                <h2>Haptic Feedback</h2>
-                <p>Feel the action like never before.</p>
+
+            <!-- Info Banners -->
+            <div class="info-banner left" id="banner-1">
+                <div class="banner-content">
+                    <span class="label">Integrated I/O</span>
+                    <h3>Lightning Speed</h3>
+                    <p>The custom integration of the PS5 console's systems lets creators pull data from the SSD so quickly that they can design games in ways never before possible.</p>
+                </div>
             </div>
-            <div class="text-overlay second">
-                <h2>Adaptive Triggers</h2>
-                <p>Dynamic resistance for every pull.</p>
+
+            <div class="info-banner right" id="banner-2">
+                <div class="banner-content">
+                    <span class="label">Haptic Feedback</span>
+                    <h3>Immersive Mastery</h3>
+                    <p>Experience haptic feedback via the DualSense wireless controller in select PS5 titles and feel the effects and impact of your in-game actions through dynamic sensory feedback.</p>
+                </div>
             </div>
-            <div class="text-overlay third">
-                <h2>Iconic Design</h2>
-                <p>Signature comfort and style.</p>
+
+            <div class="info-banner left" id="banner-3">
+                <div class="banner-content">
+                    <span class="label">Adaptive Triggers</span>
+                    <h3>Dynamic Tension</h3>
+                    <p>Get to grips with immersive adaptive triggers, featuring dynamic resistance levels which simulate the physical impact of in-game activities in select PS5 games.</p>
+                </div>
             </div>
         </section>
 

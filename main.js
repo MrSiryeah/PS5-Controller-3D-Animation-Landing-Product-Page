@@ -6,7 +6,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 // Initialize Lenis for smooth scrolling
 const lenis = new Lenis({
-    duration: 1.2,
+    duration: 1.5,
     easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
     smoothWheel: true,
 });
@@ -17,20 +17,57 @@ function raf(time) {
 }
 requestAnimationFrame(raf);
 
-// Sync Lenis with ScrollTrigger
 lenis.on('scroll', ScrollTrigger.update);
 
+// Canvas setup
+const canvas = document.getElementById('video-canvas');
+const context = canvas.getContext('2d');
 const video = document.getElementById('scroll-video');
 const videoSection = document.querySelector('.video-section');
 
-// Wait for video metadata to be loaded
+// Set canvas dimensions
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    render();
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+function render() {
+    if (video.readyState >= 2) {
+        const videoRatio = video.videoWidth / video.videoHeight;
+        const canvasRatio = canvas.width / canvas.height;
+        
+        let drawWidth, drawHeight, xOffset, yOffset;
+
+        if (canvasRatio > videoRatio) {
+            drawWidth = canvas.width;
+            drawHeight = canvas.width / videoRatio;
+            xOffset = 0;
+            yOffset = (canvas.height - drawHeight) / 2;
+        } else {
+            drawHeight = canvas.height;
+            drawWidth = canvas.height * videoRatio;
+            yOffset = 0;
+            xOffset = (canvas.width - drawWidth) / 2;
+        }
+
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(video, xOffset, yOffset, drawWidth, drawHeight);
+    }
+}
+
+// Video scrubbing logic
 video.onloadedmetadata = () => {
     initAnimations();
+    resizeCanvas();
 };
 
-// Fallback if metadata is already loaded
 if (video.readyState >= 2) {
     initAnimations();
+    resizeCanvas();
 }
 
 function initAnimations() {
@@ -39,52 +76,51 @@ function initAnimations() {
     tlHero.to('.hero h1', { opacity: 1, y: 0, duration: 1.5, ease: 'power4.out' })
           .to('.hero .subtitle', { opacity: 1, y: 0, duration: 1, ease: 'power3.out' }, '-=0.8');
 
-    // Video Scroll Sync (Reversed)
+    // Scroll-synced video rendering
+    const scrollProp = { progress: 0 };
+
     ScrollTrigger.create({
         trigger: videoSection,
         start: 'top top',
         end: 'bottom bottom',
-        scrub: 1.5, // Increased scrub for even smoother movement
+        scrub: true,
         onUpdate: (self) => {
             if (video.duration) {
-                // Reverse mapping: 1 (start) to 0 (end)
-                // If progress is 0 (top), targetTime is duration (full video)
-                // If progress is 1 (bottom), targetTime is 0
-                // User wants: "starts deconstructed and at the bottom is the full built controller"
-                // Assuming the video goes from Built -> Deconstructed:
-                // progress 0 (top) -> targetTime 0 (Built)
-                // progress 1 (bottom) -> targetTime duration (Deconstructed)
-                // Wait, the user said: "starts deconstructed and at the bottom is the full built controller"
-                // This means:
-                // Scroll Top -> Video End (Deconstructed)
-                // Scroll Bottom -> Video Start (Built)
-                
+                // Reversed logic: 1 at top, 0 at bottom
+                // Scroll Top (progress 0) -> targetTime is duration (Deconstructed)
+                // Scroll Bottom (progress 1) -> targetTime is 0 (Built)
                 const targetTime = (1 - self.progress) * video.duration;
                 
-                // Using a direct update with a small lerp-like behavior via GSAP
+                // Using gsap.to to smoothly interpolate the currentTime
                 gsap.to(video, {
                     currentTime: targetTime,
-                    duration: 0.5, // Buffer for smoothness
-                    ease: 'power1.out',
+                    duration: 0.1,
+                    onUpdate: render,
                     overwrite: true
                 });
             }
         }
     });
 
-    // Text Overlay Animations
-    const textOverlays = document.querySelectorAll('.text-overlay');
-    textOverlays.forEach((overlay) => {
-        gsap.to(overlay, {
-            opacity: 1,
-            pointerEvents: 'auto',
-            scrollTrigger: {
-                trigger: overlay,
-                // Adjust start/end to span the longer section
-                start: 'top 70%',
-                end: 'top 30%',
-                scrub: 1,
-                toggleActions: 'play reverse play reverse'
+    // Info Banners
+    const banners = [
+        { id: '#banner-1', start: 0.15, end: 0.35 },
+        { id: '#banner-2', start: 0.45, end: 0.65 },
+        { id: '#banner-3', start: 0.75, end: 0.95 }
+    ];
+
+    banners.forEach((banner) => {
+        ScrollTrigger.create({
+            trigger: videoSection,
+            start: `${banner.start * 100}% top`,
+            end: `${banner.end * 100}% top`,
+            onToggle: (self) => {
+                const el = document.querySelector(banner.id);
+                if (self.isActive) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
             }
         });
     });
@@ -102,3 +138,6 @@ function initAnimations() {
         }
     });
 }
+
+// Initial render loop to keep canvas alive if video is playing/buffering
+gsap.ticker.add(render);
